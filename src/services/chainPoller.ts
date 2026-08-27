@@ -9,7 +9,7 @@ type LogHandler = (logs: {
   transfers: unknown[];
 }) => void;
 
-const CHUNK_SIZE = 5_000n;
+const CHUNK_SIZE = 40_000n;
 
 const purchaseEvent = BRKZ_SALE_ABI.find((e) => e.type === 'event' && e.name === 'TokensPurchased')!;
 const activatedEvent = BROKERZ_HOMES_ABI.find((e) => e.type === 'event' && e.name === 'Activated')!;
@@ -50,7 +50,13 @@ async function tick(): Promise<void> {
       return;
     }
 
+    const behind = head - cursor;
+    if (behind > CHUNK_SIZE) {
+      console.log(`[poller] catching up ${behind.toString()} blocks from ${cursor.toString()} to ${head.toString()}`);
+    }
+
     let from = cursor + 1n;
+    let scanned = 0n;
     while (from <= head) {
       const to = from + CHUNK_SIZE - 1n > head ? head : from + CHUNK_SIZE - 1n;
 
@@ -67,11 +73,20 @@ async function tick(): Promise<void> {
 
       cursor = to;
       from = to + 1n;
+      scanned += CHUNK_SIZE;
+
+      if (behind > CHUNK_SIZE && scanned % (CHUNK_SIZE * 10n) === 0n) {
+        console.log(`[poller] ${(head - cursor).toString()} blocks remaining`);
+      }
     }
 
+    if (behind > CHUNK_SIZE) {
+      console.log(`[poller] caught up at block ${cursor.toString()}`);
+    }
     lastError = null;
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
+    console.error(`[poller] ${lastError} (will retry from block ${cursor.toString()})`);
     // Cursor is left untouched so the next pass re-scans the same range.
     // Nothing is skipped by a transient failure.
   } finally {
