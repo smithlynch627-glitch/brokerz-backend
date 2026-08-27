@@ -1,0 +1,33 @@
+{
+  "name": "brokerz-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read-only API layer between the Brokerz frontend and Robinhood Chain - no wallet, no private keys, no signing. Reads contract state, indexes holders, and streams live activity so the frontend never talks to an RPC directly.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "viem": "^2.21.54"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
