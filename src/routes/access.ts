@@ -73,6 +73,32 @@ accessRouter.get('/verify', async (req, res) => {
 });
 
 /**
+ * POST /api/access/check  body: { code }
+ * Verifies a code without consuming it, so people can confirm theirs is real
+ * before the window opens. Rate-limited as hard as redeem: this is a code
+ * oracle, and left open it would let someone enumerate valid codes.
+ */
+accessRouter.post('/check', redeemRateLimit, async (req, res) => {
+  const { code } = req.body ?? {};
+
+  if (typeof code !== 'string' || !CODE_SHAPE.test(code.trim())) {
+    res.json({ status: 'invalid' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('check_code', { p_code: code.trim() });
+    if (error) {
+      res.status(502).json({ error: 'Could not check that code right now.' });
+      return;
+    }
+    res.json({ status: data as 'valid' | 'used' | 'invalid' });
+  } catch {
+    res.status(502).json({ error: 'Could not check that code right now.' });
+  }
+});
+
+/**
  * POST /api/access/redeem  body: { code }
  * Returns a session token on success. Heavily rate-limited: this is the
  * endpoint a script would hammer to guess codes.

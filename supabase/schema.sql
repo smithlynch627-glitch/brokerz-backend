@@ -153,6 +153,53 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- check_code: tells someone whether their code will work, without consuming
+-- it. Lets people confirm a code is genuine before the window opens, so nobody
+-- discovers a bad code at the moment it matters.
+-- Returns 'valid' | 'used' | 'invalid'.
+-- ----------------------------------------------------------------------------
+create or replace function check_code(p_code text)
+returns text
+language plpgsql
+as $$
+declare
+  v_used_at timestamptz;
+  v_found boolean := false;
+  v_match_count int;
+begin
+  if p_code is null or length(trim(p_code)) = 0 then
+    return 'invalid';
+  end if;
+
+  select used_at, true into v_used_at, v_found
+  from access_codes
+  where lower(code) = lower(trim(p_code))
+  limit 1;
+
+  if not v_found then
+    select count(*) into v_match_count
+    from access_codes
+    where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code));
+
+    if v_match_count = 1 then
+      select used_at, true into v_used_at, v_found
+      from access_codes
+      where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code))
+      limit 1;
+    end if;
+  end if;
+
+  if not v_found then
+    return 'invalid';
+  end if;
+  if v_used_at is not null then
+    return 'used';
+  end if;
+  return 'valid';
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- session_is_valid: called on every page load to re-check a stored session.
 -- ----------------------------------------------------------------------------
 create or replace function session_is_valid(p_token_hash text)
