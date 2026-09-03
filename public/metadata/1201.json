@@ -1,0 +1,22 @@
+{
+  "name": "BROKERZ HOMES #1201",
+  "image": "ipfs://bafybeifvvccwkeotfqu5txgjw2l2ft4qgegfy5tmnq7nkflwgmdd6s5foe/1201.jpg",
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Charcoal"
+    },
+    {
+      "trait_type": "Home color",
+      "value": "Red"
+    },
+    {
+      "trait_type": "Base Mining Rate",
+      "value": "250 $BRKZ/day"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Epic"
+    }
+  ]
+}

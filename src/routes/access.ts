@@ -132,7 +132,7 @@ accessRouter.post('/redeem', redeemRateLimit, async (req, res) => {
       return;
     }
     if (!data) {
-      res.status(400).json({ error: 'That code is invalid or has already been used.' });
+      res.status(400).json({ error: "We don't recognise that code. Check it and try again." });
       return;
     }
 

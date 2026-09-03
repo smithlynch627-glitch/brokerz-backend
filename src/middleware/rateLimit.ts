@@ -1,38 +1,56 @@
 import rateLimit from 'express-rate-limit';
 
-// Generous but real - normal polling (stats every few seconds, one wallet
-// lookup on connect) sits comfortably under this. A script hammering the
-// API gets throttled with a standard 429 response instead of being able to
-// drive unlimited RPC calls through this server.
+function num(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isNaN(n) ? fallback : n;
+}
+
+const API_LIMIT = num('RATE_LIMIT_API', 2000);
+const STREAM_LIMIT = num('RATE_LIMIT_STREAM', 200);
+const REDEEM_LIMIT = num('RATE_LIMIT_REDEEM', 30);
+
+/**
+ * Counted per IP, but mobile carriers put thousands of users behind a single
+ * address via CGNAT — so a limit tuned for one person throttles a whole
+ * network. The default is set high enough that shared IPs are not punished,
+ * while still capping a script hammering the API.
+ *
+ * Set RATE_LIMIT_API=0 to disable entirely.
+ */
 export const apiRateLimit = rateLimit({
   windowMs: 60_000,
-  limit: 120, // per IP, per minute
+  limit: API_LIMIT,
+  skip: () => API_LIMIT === 0,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests - slow down and try again shortly.' },
+  message: { error: 'Too many requests — slow down and try again shortly.' },
 });
 
-// SSE connections are long-lived, not repeated requests - rate-limit how
-// often a single IP can OPEN a new stream connection, separately from the
-// general API limit above (a reconnect loop shouldn't burn through the
-// same budget as normal polling would).
 export const streamRateLimit = rateLimit({
   windowMs: 60_000,
-  limit: 10,
+  limit: STREAM_LIMIT,
+  skip: () => STREAM_LIMIT === 0,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many stream connection attempts - slow down and try again shortly.' },
+  message: { error: 'Too many stream connection attempts — try again shortly.' },
 });
 
-// Much stricter than the general API limit, and specifically scoped to
-// code-redemption attempts - this is the main defense against someone
-// scripting through guesses at a valid access code. 31^12 possible codes
-// makes brute-forcing infeasible on its own, but rate limiting is cheap
-//, meaningful defense-in-depth on top of that, not a substitute for it.
+/**
+ * Guards code redemption and checking.
+ *
+ * Keep this one. Codes are now reusable, so a single valid code found by
+ * guessing grants permanent access to everyone it is shared with — which
+ * makes brute-forcing far more valuable than when codes were single-use.
+ * This is the only thing standing between an attacker and enumerating the
+ * code space.
+ */
 export const redeemRateLimit = rateLimit({
   windowMs: 15 * 60_000,
-  limit: 10,
+  limit: REDEEM_LIMIT,
+  skip: () => REDEEM_LIMIT === 0,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts - wait a while before trying again.' },
+  message: { error: 'Too many attempts — wait a few minutes and try again.' },
 });

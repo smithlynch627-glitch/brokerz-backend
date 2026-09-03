@@ -6,6 +6,7 @@ import { statsRouter } from './routes/stats.js';
 import { walletRouter } from './routes/wallet.js';
 import { activityRouter } from './routes/activity.js';
 import { accessRouter } from './routes/access.js';
+import { metadataRouter } from './routes/metadata.js';
 import { startChainPoller } from './services/chainPoller.js';
 import './services/holderIndexer.js';
 import './services/activityService.js';
@@ -25,7 +26,11 @@ const app = express();
 app.set('trust proxy', 1);
 
 applySecurityMiddleware(app);
-app.use(apiRateLimit);
+// Rate limiting is scoped to /api only. Metadata is static public JSON with
+// no abuse value, and marketplace crawlers fetch all 2,222 files in a burst
+// from a handful of IPs — throttling them makes OpenSea cache failures as
+// permanently broken tokens.
+app.use('/api', apiRateLimit);
 // Small limit deliberately - every request body in this API is a wallet
 // address and/or a 14-character code, nothing here should ever need more
 // than a few hundred bytes. Rejects oversized payloads before they're even
@@ -38,6 +43,10 @@ app.use('/api/stats', statsRouter);
 app.use('/api/wallet', walletRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/access', accessRouter);
+
+// NFT metadata. Deliberately not under /api — the URL ends up baked into the
+// contract, so it should read cleanly and never change.
+app.use('/metadata', metadataRouter);
 
 // 404 for anything else - this server only ever serves the routes above,
 // nothing else should exist to be discovered by scanning.

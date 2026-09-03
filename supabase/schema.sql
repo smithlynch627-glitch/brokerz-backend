@@ -30,7 +30,8 @@ drop function if exists has_access(text);
 create table if not exists access_codes (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
-  used_at timestamptz,
+  used_at timestamptz,          -- last use; not a gate
+  use_count int not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -116,22 +117,20 @@ begin
     return false;
   end if;
 
-  -- 1. exact, case-insensitive
   select id into v_code_id
   from access_codes
-  where lower(code) = lower(trim(p_code)) and used_at is null
+  where lower(code) = lower(trim(p_code))
   limit 1;
 
-  -- 2. typo-tolerant fallback, only if unambiguous
   if v_code_id is null then
     select count(*) into v_match_count
     from access_codes
-    where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code)) and used_at is null;
+    where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code));
 
     if v_match_count = 1 then
       select id into v_code_id
       from access_codes
-      where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code)) and used_at is null
+      where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code))
       limit 1;
     end if;
   end if;
@@ -140,14 +139,14 @@ begin
     return false;
   end if;
 
-  -- Claim it. The `used_at is null` guard makes this atomic under
-  -- concurrency: two simultaneous redeems of the same code, only one wins.
-  update access_codes set used_at = now() where id = v_code_id and used_at is null;
-  if not found then
-    return false;
-  end if;
+  update access_codes
+  set use_count = use_count + 1, used_at = now()
+  where id = v_code_id;
 
-  insert into access_sessions (token_hash, code_id) values (p_token_hash, v_code_id);
+  insert into access_sessions (token_hash, code_id)
+  values (p_token_hash, v_code_id)
+  on conflict (token_hash) do nothing;
+
   return true;
 end;
 $$;
@@ -163,39 +162,32 @@ returns text
 language plpgsql
 as $$
 declare
-  v_used_at timestamptz;
-  v_found boolean := false;
+  v_id uuid;
   v_match_count int;
 begin
   if p_code is null or length(trim(p_code)) = 0 then
     return 'invalid';
   end if;
 
-  select used_at, true into v_used_at, v_found
+  select id into v_id
   from access_codes
   where lower(code) = lower(trim(p_code))
   limit 1;
 
-  if not v_found then
+  if v_id is null then
     select count(*) into v_match_count
     from access_codes
     where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code));
 
     if v_match_count = 1 then
-      select used_at, true into v_used_at, v_found
+      select id into v_id
       from access_codes
       where normalize_ambiguous(code) = normalize_ambiguous(trim(p_code))
       limit 1;
     end if;
   end if;
 
-  if not v_found then
-    return 'invalid';
-  end if;
-  if v_used_at is not null then
-    return 'used';
-  end if;
-  return 'valid';
+  return case when v_id is null then 'invalid' else 'valid' end;
 end;
 $$;
 
