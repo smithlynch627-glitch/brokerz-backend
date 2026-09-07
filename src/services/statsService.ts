@@ -3,6 +3,7 @@ import { brkzContract, brkzSaleContract, brokerzHomesContract } from '../chain.j
 import { cached } from '../cache.js';
 import { config } from '../config.js';
 import { getEthUsdPrice } from './priceService.js';
+import { getFloorPrice } from './floorPrice.js';
 
 const TOTAL_SUPPLY_AT_DEPLOY = 500_000_000n * 10n ** 18n;
 
@@ -38,6 +39,7 @@ export interface StatsResponse {
     teamReserve: number;
     teamMinted: number;
     teamMintFinalized: boolean;
+    floorPriceEth: number | null;
     publicSupply: number;
     publicMinted: number;
     publicRemaining: number;
@@ -47,7 +49,7 @@ export interface StatsResponse {
 }
 
 async function computeStats(): Promise<StatsResponse> {
-  const [totalSupply, remainingInPool, pricePerToken, maxPurchasePerWallet, totalMinted, maxSupply, maxPerWallet, teamReserve, teamMintedRaw, teamMintFinalized, ethUsdPrice] =
+  const [totalSupply, remainingInPool, pricePerToken, maxPurchasePerWallet, totalMinted, maxSupply, maxPerWallet, teamReserve, teamMintedRaw, teamMintFinalized, ethUsdPrice, floorPriceEth] =
     await Promise.all([
       brkzContract.read.totalSupply(),
       brkzSaleContract.read.remainingInventory(),
@@ -60,6 +62,7 @@ async function computeStats(): Promise<StatsResponse> {
       brokerzHomesContract.read.teamMinted(),
       brokerzHomesContract.read.teamMintFinalized(),
       getEthUsdPrice(),
+      getFloorPrice(),
     ]);
 
   const totalBurned = TOTAL_SUPPLY_AT_DEPLOY - totalSupply;
@@ -112,6 +115,7 @@ async function computeStats(): Promise<StatsResponse> {
       teamReserve: teamReserveNum,
       teamMinted: teamMintedNum,
       teamMintFinalized: Boolean(teamMintFinalized),
+      floorPriceEth,
       publicSupply,
       publicMinted,
       publicRemaining: Math.max(0, publicSupply - publicMinted),

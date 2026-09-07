@@ -1,0 +1,27 @@
+export const RAFFLE_ABI = [
+  { type:'function', name:'raffleCount', stateMutability:'view', inputs:[], outputs:[{type:'uint256'}] },
+  { type:'function', name:'raffles', stateMutability:'view', inputs:[{name:'id',type:'uint256'}], outputs:[
+      {name:'kind',type:'uint8'},{name:'spots',type:'uint32'},{name:'winnersDrawn',type:'uint32'},
+      {name:'startsAt',type:'uint64'},{name:'endsAt',type:'uint64'},
+      {name:'costPerEntry',type:'uint256'},{name:'maxEntriesPerUser',type:'uint32'}] },
+  { type:'function', name:'raffleState', stateMutability:'view', inputs:[{name:'id',type:'uint256'}], outputs:[
+      {name:'seedCommitment',type:'bytes32'},{name:'seedRevealed',type:'bool'},
+      {name:'cancelled',type:'bool'},{name:'archived',type:'bool'},
+      {name:'proceedsReleased',type:'bool'},{name:'totalWeight',type:'uint256'},
+      {name:'remainingWeight',type:'uint256'},{name:'escrow',type:'uint256'}] },
+  { type:'function', name:'tierCount', stateMutability:'view', inputs:[], outputs:[{type:'uint256'}] },
+  { type:'function', name:'tiers', stateMutability:'view', inputs:[{name:'',type:'uint256'}],
+    outputs:[{name:'minNfts',type:'uint32'},{name:'entries',type:'uint32'}] },
+  { type:'function', name:'weightForHoldings', stateMutability:'view', inputs:[{name:'user',type:'address'}], outputs:[{type:'uint256'}] },
+  { type:'function', name:'entryWeight', stateMutability:'view', inputs:[{name:'',type:'uint256'},{name:'',type:'address'}], outputs:[{type:'uint256'}] },
+  { type:'function', name:'hasEntered', stateMutability:'view', inputs:[{name:'',type:'uint256'},{name:'',type:'address'}], outputs:[{type:'bool'}] },
+  { type:'function', name:'hasWon', stateMutability:'view', inputs:[{name:'',type:'uint256'},{name:'',type:'address'}], outputs:[{type:'bool'}] },
+  { type:'function', name:'getWinners', stateMutability:'view', inputs:[{name:'id',type:'uint256'}], outputs:[{type:'address[]'}] },
+  { type:'function', name:'participantCount', stateMutability:'view', inputs:[{name:'id',type:'uint256'}], outputs:[{type:'uint256'}] },
+  { type:'function', name:'isOpen', stateMutability:'view', inputs:[{name:'id',type:'uint256'}], outputs:[{type:'bool'}] },
+  { type:'function', name:'enterWithNft', stateMutability:'nonpayable', inputs:[{name:'id',type:'uint256'}], outputs:[] },
+  { type:'function', name:'enterWithBrkz', stateMutability:'nonpayable', inputs:[{name:'id',type:'uint256'},{name:'entries',type:'uint32'}], outputs:[] },
+  { type:'function', name:'draw', stateMutability:'nonpayable',
+    inputs:[{name:'id',type:'uint256'},{name:'seed',type:'bytes32'},{name:'count',type:'uint32'}], outputs:[] },
+  { type:'function', name:'claimGtd', stateMutability:'nonpayable', inputs:[{name:'id',type:'uint256'}], outputs:[] },
+] as const;

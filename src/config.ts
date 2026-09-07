@@ -52,6 +52,20 @@ export const config = {
   // policy on your entire Supabase project - treat it with the same care
   // as a private key. It must NEVER be sent to the frontend, ever, under
   // any circumstance - it only belongs here, server-side.
+  // Rafflor. Optional — the raffle routes report unavailable until it is set,
+  // so the rest of the site works before the contract is deployed.
+  raffleAddress: (process.env.RAFFLE_ADDRESS ?? '').trim(),
+
+  // Runs automatic draws. This key can ONLY call draw() on the raffle
+  // contract — it cannot move funds, cancel a raffle or change a seed. Set
+  // it as `operator` on the contract, never as owner.
+  operatorPrivateKey: (process.env.OPERATOR_PRIVATE_KEY ?? '').trim(),
+
+  // Floor price needs an OpenSea API key. Without one the UI shows a dash
+  // rather than a made-up figure.
+  openseaApiKey: (process.env.OPENSEA_API_KEY ?? '').trim(),
+  openseaSlug: (process.env.OPENSEA_SLUG ?? 'brokerz-homes').trim(),
+
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
 

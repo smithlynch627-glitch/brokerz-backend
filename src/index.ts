@@ -7,7 +7,13 @@ import { walletRouter } from './routes/wallet.js';
 import { activityRouter } from './routes/activity.js';
 import { accessRouter } from './routes/access.js';
 import { metadataRouter } from './routes/metadata.js';
+import { showcaseRouter } from './routes/showcase.js';
+import { raffleShareRouter } from './routes/raffleShare.js';
+import { profileRouter } from './routes/profile.js';
+import { raffleRouter } from './routes/raffle.js';
+import { raffleAdminRouter } from './routes/raffleAdmin.js';
 import { startChainPoller } from './services/chainPoller.js';
+import { startAutoDraw } from './services/autoDraw.js';
 import './services/holderIndexer.js';
 import './services/activityService.js';
 
@@ -43,10 +49,18 @@ app.use('/api/stats', statsRouter);
 app.use('/api/wallet', walletRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/access', accessRouter);
+app.use('/api/raffles', raffleRouter);
+app.use('/api/profile', profileRouter);
+app.use('/api/raffle-admin', raffleAdminRouter);
 
 // NFT metadata. Deliberately not under /api — the URL ends up baked into the
 // contract, so it should read cleanly and never change.
 app.use('/metadata', metadataRouter);
+app.use('/api/art', showcaseRouter);
+
+// Server-rendered share pages. Not under /api because the URL is shared
+// publicly and appears in tweets.
+app.use('/r', raffleShareRouter);
 
 // 404 for anything else - this server only ever serves the routes above,
 // nothing else should exist to be discovered by scanning.
@@ -58,4 +72,5 @@ app.listen(config.port, () => {
   console.log(`Allowed frontend origins: ${config.allowedOrigins.join(', ')}`);
 
   startChainPoller();
+  startAutoDraw();
 });
