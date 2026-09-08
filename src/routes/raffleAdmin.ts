@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { isAddress, verifyMessage } from 'viem';
 import { supabase } from '../supabase.js';
 import { getWinners, participantCount } from '../services/raffleChain.js';
+import { drawWinners } from '../services/offchainDraw.js';
 import { redeemRateLimit } from '../middleware/rateLimit.js';
 
 export const raffleAdminRouter = Router();
@@ -197,6 +198,85 @@ raffleAdminRouter.delete('/raffles/:id', async (req, res) => {
     message: `Deleted "${raffle.project_name}" and ${count ?? 0} ${count === 1 ? 'entry' : 'entries'}.`,
     onChainRemains: raffle.chain_raffle_id !== null,
   });
+});
+
+/**
+ * POST /api/raffle-admin/raffles/:id/draw-now
+ *
+ * Runs the draw immediately, ignoring the timer.
+ *
+ * The scheduler only picks up raffles whose end time has passed, so a raffle
+ * that needs deciding early — or one whose scheduled attempt failed — has no
+ * other way to be resolved from the panel.
+ */
+raffleAdminRouter.post('/raffles/:id/draw-now', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const { data: r } = await supabase
+    .from('raffles')
+    .select('id, slug, kind, spots, gasless, seed_secret, chain_raffle_id, status')
+    .eq('id', req.params.id).maybeSingle();
+
+  if (!r) { res.status(404).json({ error: 'Raffle not found' }); return; }
+  if (r.status === 'cancelled') { res.status(400).json({ error: 'This raffle is cancelled' }); return; }
+
+  // Fixed-GTD spots were claimed as they were bought — nothing to draw
+  if (r.kind === 'fixed_gtd') {
+    await supabase.from('raffles')
+      .update({ status: 'drawn', winners_published: true }).eq('id', r.id);
+    res.json({ ok: true, message: 'Spots were claimed directly. Winners published.' });
+    return;
+  }
+
+  if (!r.gasless) {
+    res.status(400).json({
+      error: 'This raffle draws on-chain. Call draw() on the contract, then press Refresh winners.',
+    });
+    return;
+  }
+
+  if (!r.seed_secret) {
+    res.status(400).json({ error: 'No draw seed stored for this raffle — it cannot be drawn.' });
+    return;
+  }
+
+  const { data: entrants } = await supabase
+    .from('raffle_entries').select('wallet_address, entry_weight').eq('raffle_id', r.id);
+
+  if (!entrants?.length) {
+    res.status(400).json({ error: 'Nobody entered this raffle.' });
+    return;
+  }
+
+  try {
+    const picked = drawWinners(
+      r.seed_secret,
+      entrants.map((e) => ({ wallet: e.wallet_address, weight: e.entry_weight })),
+      r.spots
+    );
+
+    if (picked.length) {
+      await supabase.from('raffle_winners').upsert(
+        picked.map((w, i) => ({ raffle_id: r.id, wallet_address: w, position: i })),
+        { onConflict: 'raffle_id,wallet_address' }
+      );
+    }
+
+    await supabase.from('raffles').update({
+      status: 'drawn',
+      winners_published: true,
+      ends_at: new Date().toISOString(),
+      seed_published_at: new Date().toISOString(),
+      draw_attempted_at: new Date().toISOString(),
+      draw_error: null,
+    }).eq('id', r.id);
+
+    res.json({ ok: true, message: `Drew ${picked.length} of ${r.spots} and published them.` });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase.from('raffles').update({ draw_error: message.slice(0, 300) }).eq('id', r.id);
+    res.status(502).json({ error: message });
+  }
 });
 
 // POST /api/raffle-admin/raffles — create, with its task list
