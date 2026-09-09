@@ -356,7 +356,10 @@ raffleAdminRouter.patch('/raffles/:id', async (req, res) => {
 raffleAdminRouter.get('/raffles/:id/entries', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { data, error } = await supabase
-    .from('raffle_entries').select('*').eq('raffle_id', req.params.id)
+    .from('raffle_entries')
+    .select('wallet_address, delivery_address, delivery_chain, burner_wallet, x_username, ' +
+            'discord_username, entry_weight, tx_hash, created_at')
+    .eq('raffle_id', req.params.id)
     .order('entry_weight', { ascending: false });
   if (error) { res.status(502).json({ error: 'Could not load entries' }); return; }
   res.json({ entries: data ?? [] });
