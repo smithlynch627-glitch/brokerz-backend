@@ -339,7 +339,7 @@ raffleAdminRouter.post('/raffles', async (req, res) => {
 // PATCH /api/raffle-admin/raffles/:id
 raffleAdminRouter.patch('/raffles/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const allowed = ['status','chain_raffle_id','seed_secret','seed_commitment','chain_key','gasless','auto_draw','banner_url','logo_url','project_description',
+  const allowed = ['status','chain_raffle_id','seed_secret','seed_commitment','chain_key','gasless','auto_draw','hidden','banner_url','logo_url','project_description',
     'project_x','project_discord','project_telegram','team_x','team_discord','team_telegram',
     'spots','cost_per_entry','max_entries_per_user','starts_at','ends_at','winners_published','spot_type'];
 

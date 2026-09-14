@@ -19,6 +19,7 @@ raffleRouter.get('/', async (_req, res) => {
     .from('raffle_public')
     .select('*')
     .in('status', ['live', 'ended', 'drawn'])
+    .eq('hidden', false)
     .order('ends_at', { ascending: false });
 
   if (error) { res.status(502).json({ error: 'Could not load raffles' }); return; }

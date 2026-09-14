@@ -21,7 +21,10 @@ export function applySecurityMiddleware(app: Express): void {
   app.use(
     cors({
       origin: config.allowedOrigins,
-      methods: ['GET', 'POST'], // GET for read-only routes, POST for access-code redemption
+      // DELETE and PATCH are used by the raffle admin panel. Omitting them
+      // makes the browser block the request before it is sent, which surfaces
+      // as an opaque "failed to fetch" with nothing in the server log.
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     })
   );
 }

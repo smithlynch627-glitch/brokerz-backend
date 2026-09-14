@@ -63,6 +63,10 @@ alter table raffles add column if not exists gasless boolean not null default fa
 alter table raffles add column if not exists seed_commitment text;
 alter table raffles add column if not exists seed_published_at timestamptz;
 
+-- Separate from status: hiding a raffle from the public list is a display
+-- choice, while status='cancelled' carries meaning about refunds.
+alter table raffles add column if not exists hidden boolean not null default false;
+
 -- Holder raffles carry no on-chain entries, so chain_raffle_id may be null.
 alter table raffles alter column chain_raffle_id drop not null;
 
@@ -119,7 +123,7 @@ select
   r.team_x, r.team_discord, r.team_telegram,
   r.spots, r.cost_per_entry, r.max_entries_per_user,
   r.starts_at, r.ends_at, r.status, r.winners_published,
-  r.chain_key, r.gasless, r.seed_commitment, r.seed_published_at,
+  r.chain_key, r.gasless, r.seed_commitment, r.seed_published_at, r.hidden,
   c.label as chain_label, c.family as chain_family,
   (select count(*) from raffle_entries e where e.raffle_id = r.id) as entrant_count,
   (select coalesce(sum(e.entry_weight),0) from raffle_entries e where e.raffle_id = r.id) as total_weight,
