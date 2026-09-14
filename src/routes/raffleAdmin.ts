@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { isAddress, verifyMessage } from 'viem';
 import { supabase } from '../supabase.js';
+import { config } from '../config.js';
 import { getWinners, participantCount } from '../services/raffleChain.js';
 import { drawWinners } from '../services/offchainDraw.js';
+import { privateKeyToAccount } from 'viem/accounts';
 import { redeemRateLimit } from '../middleware/rateLimit.js';
 
 export const raffleAdminRouter = Router();
@@ -108,6 +110,29 @@ raffleAdminRouter.get('/me', (req, res) => {
   const wallet = requireAdmin(req, res);
   if (!wallet) return;
   res.json({ wallet });
+});
+
+/**
+ * GET /api/raffle-admin/operator
+ * The public address derived from OPERATOR_PRIVATE_KEY.
+ *
+ * Returns an address, never the key. The owner has to call setOperator with
+ * this value or the backend cannot draw — and without it there is no way to
+ * find the address short of importing the key into a wallet by hand.
+ */
+raffleAdminRouter.get('/operator', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  if (!config.operatorPrivateKey) {
+    res.json({ configured: false, address: null });
+    return;
+  }
+  try {
+    const account = privateKeyToAccount(config.operatorPrivateKey as `0x${string}`);
+    res.json({ configured: true, address: account.address });
+  } catch {
+    res.json({ configured: true, address: null, error: 'OPERATOR_PRIVATE_KEY is not a valid key' });
+  }
 });
 
 // GET /api/raffle-admin/raffles — everything, drafts included
