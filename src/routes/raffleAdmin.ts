@@ -245,6 +245,11 @@ raffleAdminRouter.post('/raffles/:id/draw-now', async (req, res) => {
   if (!r) { res.status(404).json({ error: 'Raffle not found' }); return; }
   if (r.status === 'cancelled') { res.status(400).json({ error: 'This raffle is cancelled' }); return; }
 
+  // Re-running is allowed on purpose. A raffle can end up marked drawn with an
+  // empty winners table — a failed mirror, or an early bug — and refusing here
+  // would leave no way to repair it. The seed is fixed, so a re-run reproduces
+  // the same winners rather than re-rolling them.
+
   // Fixed-GTD spots were claimed as they were bought — there is no draw, but
   // the claimers still have to be copied into raffle_winners or the public
   // page has nothing to show.
