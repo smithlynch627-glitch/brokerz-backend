@@ -38,15 +38,41 @@ async function tick(): Promise<void> {
   try {
     const nowIso = new Date().toISOString();
 
-    // Raffles past their end time that still need drawing
-    const { data: due } = await supabase
+    // Raffles past their end time that still need resolving
+    const { data: expired } = await supabase
       .from('raffles')
       .select('id, slug, chain_raffle_id, kind, spots, seed_secret, auto_draw, status, gasless')
       .lte('ends_at', nowIso)
       .in('status', ['live', 'ended'])
       .eq('auto_draw', true);
 
-    if (!due?.length) return;
+    // Fixed-GTD raffles that sold out early.
+    //
+    // Their winners are decided the moment someone pays — there is no draw to
+    // wait for. Holding them until the timer expires left buyers looking at
+    // "not published yet" on a raffle that had already closed.
+    const { data: gtdLive } = await supabase
+      .from('raffles')
+      .select('id, slug, chain_raffle_id, kind, spots, seed_secret, auto_draw, status, gasless')
+      .eq('kind', 'fixed_gtd')
+      .eq('status', 'live')
+      .eq('auto_draw', true);
+
+    const soldOut: typeof gtdLive = [];
+    for (const r of gtdLive ?? []) {
+      const { count } = await supabase
+        .from('raffle_entries').select('id', { count: 'exact', head: true }).eq('raffle_id', r.id);
+      if ((count ?? 0) >= r.spots) soldOut.push(r);
+    }
+
+    const seen = new Set<string>();
+    const due = [...(expired ?? []), ...soldOut].filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+
+    if (!due.length) return;
 
     const wallet = operatorClient();
 
@@ -123,8 +149,19 @@ async function tick(): Promise<void> {
           }
         }
 
-        // Mirror whatever the chain says, drawn just now or previously
-        const winners = await getWinners(Number(r.chain_raffle_id));
+        // Mirror whatever the chain says, drawn just now or previously.
+        // For fixed-GTD this is the claim list, not a draw result.
+        let winners = await getWinners(Number(r.chain_raffle_id));
+
+        if (!winners.length && r.kind === 'fixed_gtd') {
+          // Contract read came back empty — everyone who entered a GTD raffle
+          // holds a spot, so fall back to the recorded entries.
+          const { data: entries } = await supabase
+            .from('raffle_entries').select('wallet_address').eq('raffle_id', r.id)
+            .order('created_at', { ascending: true }).limit(r.spots);
+          winners = (entries ?? []).map((e) => e.wallet_address);
+        }
+
         if (winners.length) {
           await supabase.from('raffle_winners').upsert(
             winners.map((a, i) => ({

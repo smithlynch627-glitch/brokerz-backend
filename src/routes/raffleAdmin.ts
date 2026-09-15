@@ -245,11 +245,38 @@ raffleAdminRouter.post('/raffles/:id/draw-now', async (req, res) => {
   if (!r) { res.status(404).json({ error: 'Raffle not found' }); return; }
   if (r.status === 'cancelled') { res.status(400).json({ error: 'This raffle is cancelled' }); return; }
 
-  // Fixed-GTD spots were claimed as they were bought — nothing to draw
+  // Fixed-GTD spots were claimed as they were bought — there is no draw, but
+  // the claimers still have to be copied into raffle_winners or the public
+  // page has nothing to show.
   if (r.kind === 'fixed_gtd') {
+    let rows: Array<{ raffle_id: string; wallet_address: string; position: number }> = [];
+
+    if (r.chain_raffle_id !== null) {
+      try {
+        const onChain = await getWinners(Number(r.chain_raffle_id));
+        rows = onChain.map((w, i) => ({ raffle_id: r.id, wallet_address: w.toLowerCase(), position: i }));
+      } catch { /* fall through to the entry list below */ }
+    }
+
+    if (!rows.length) {
+      // No contract link, or the read failed: everyone who entered a GTD
+      // raffle holds a spot by definition.
+      const { data: entries } = await supabase
+        .from('raffle_entries').select('wallet_address').eq('raffle_id', r.id)
+        .order('created_at', { ascending: true }).limit(r.spots);
+      rows = (entries ?? []).map((e, i) => ({
+        raffle_id: r.id, wallet_address: e.wallet_address.toLowerCase(), position: i,
+      }));
+    }
+
+    if (rows.length) {
+      await supabase.from('raffle_winners').upsert(rows, { onConflict: 'raffle_id,wallet_address' });
+    }
+
     await supabase.from('raffles')
       .update({ status: 'drawn', winners_published: true }).eq('id', r.id);
-    res.json({ ok: true, message: 'Spots were claimed directly. Winners published.' });
+
+    res.json({ ok: true, message: `Published ${rows.length} claimed ${rows.length === 1 ? 'spot' : 'spots'}.` });
     return;
   }
 
